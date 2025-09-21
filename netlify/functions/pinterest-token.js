@@ -46,6 +46,7 @@ exports.handler = async (event, context) => {
                 throw new Error('No authorization code received');
             }
 
+            // 1) Build form data
             const params = new URLSearchParams();
             params.append('grant_type', 'authorization_code');
             params.append('client_id', PINTEREST_APP_ID);
@@ -53,17 +54,15 @@ exports.handler = async (event, context) => {
             params.append('code', code);
             params.append('redirect_uri', PINTEREST_REDIRECT_URI);
 
-            // Exchange code for access token
-            // Exchange code for access token
-            const tokenResponse = await axios.post(
-                'https://api.pinterest.com/v5/oauth/token',
-                params.toString(),
-                {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
+            // 2) Exchange code for token
+            const tokenResponse = await axios({
+                method: 'post',
+                url: 'https://api.pinterest.com/v5/oauth/token',
+                data: params.toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
                 }
-            );
+            });
 
             // Get user info
             const userResponse = await axios.get('https://api.pinterest.com/v5/user_account', {
