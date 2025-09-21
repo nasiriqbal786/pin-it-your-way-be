@@ -1,0 +1,12 @@
+{
+  "name": "pinterest-oauth-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "netlify-cli": "^10.0.0",
+    "axios": "^1.5.0"
+  }
+}

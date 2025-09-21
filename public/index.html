@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinterest OAuth Backend - Pin It Your Way</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: #E60023;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: #E60023;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .status-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .status-ok {
+            background: #28a745;
+        }
+        
+        .status-error {
+            background: #dc3545;
+        }
+        
+        .api-info {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .endpoint {
+            font-family: Monaco, 'Courier New', monospace;
+            background: #f1f3f4;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .method-get {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .method-post {
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .test-button {
+            background: #E60023;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .test-button:hover {
+            background: #C8001F;
+        }
+        
+        .test-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .test-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .test-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">P</div>
+        <h1>Pinterest OAuth Backend</h1>
+        <p class="subtitle">Backend API for Pin It Your Way Chrome Extension</p>
+    </div>
+
+    <div class="status-section">
+        <h2>API Status</h2>
+        <p id="status-text">
+            <span id="status-indicator" class="status-indicator"></span>
+            <span id="status-message">Checking API status...</span>
+        </p>
+        <button class="test-button" onclick="testAPI()">Test API Connection</button>
+        <div id="test-result"></div>
+    </div>
+
+    <div class="api-info">
+        <h3>Available Endpoints</h3>
+        
+        <h4><span class="method-get">GET</span> Pinterest Auth Initialization</h4>
+        <div class="endpoint">/.netlify/functions/pinterest-auth</div>
+        <p>Generates Pinterest OAuth authorization URL with secure state parameter.</p>
+        
+        <h4><span class="method-get">GET</span> OAuth Callback Handler</h4>
+        <div class="endpoint">/.netlify/functions/pinterest-token?code=xxx&state=xxx</div>
+        <p>Handles Pinterest OAuth callback and exchanges authorization code for access token.</p>
+        
+        <h4><span class="method-post">POST</span> Pinterest API Proxy</h4>
+        <div class="endpoint">/.netlify/functions/pinterest-token</div>
+        <p>Secure proxy for Pinterest API calls (boards, pins, user info).</p>
+        <p><strong>Supported actions:</strong> getBoards, createPin</p>
+    </div>
+
+    <div class="api-info">
+        <h3>Environment Configuration</h3>
+        <p>The following environment variables should be configured in your Netlify dashboard:</p>
+        <ul>
+            <li><code>PINTEREST_APP_ID</code> - Your Pinterest App ID</li>
+            <li><code>PINTEREST_APP_SECRET</code> - Your Pinterest App Secret (kept secure)</li>
+            <li><code>PINTEREST_REDIRECT_URI</code> - OAuth callback URL</li>
+        </ul>
+    </div>
+
+    <div class="api-info">
+        <h3>Chrome Extension Integration</h3>
+        <p>This backend API is designed to work with the "Pin It Your Way" Chrome extension. The extension should:</p>
+        <ol>
+            <li>Call <code>/pinterest-auth</code> to initiate OAuth flow</li>
+            <li>Open Pinterest authorization in popup window</li>
+            <li>Receive tokens via postMessage after successful auth</li>
+            <li>Make API calls through <code>/pinterest-token</code> POST endpoint</li>
+        </ol>
+    </div>
+
+    <div class="footer">
+        <p>Pin It Your Way Backend API v1.0</p>
+        <p>Deployed on Netlify Functions</p>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusMessage = document.getElementById('status-message');
+            const testResult = document.getElementById('test-result');
+            
+            statusMessage.textContent = 'Testing API...';
+            statusIndicator.className = 'status-indicator';
+            testResult.innerHTML = '';
+
+            try {
+                // Test the pinterest-auth endpoint
+                const response = await fetch('/.netlify/functions/pinterest-auth');
+                const data = await response.json();
+                
+                if (data.success && data.authUrl) {
+                    statusIndicator.className = 'status-indicator status-ok';
+                    statusMessage.textContent = 'API is working correctly';
+                    testResult.innerHTML = `
+                        <div class="test-success">
+                            ✅ API Test Successful<br>
+                            - Auth endpoint responding<br>
+                            - OAuth URL generated<br>
+                            - State parameter present<br>
+                            Response: ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                } else {
+                    throw new Error('Invalid response format');
+                }
+                
+            } catch (error) {
+                statusIndicator.className = 'status-indicator status-error';
+                statusMessage.textContent = 'API test failed';
+                testResult.innerHTML = `
+                    <div class="test-error">
+                        ❌ API Test Failed<br>
+                        Error: ${error.message}<br>
+                        Please check your Netlify Functions deployment and environment variables.
+                    </div>
+                `;
+            }
+        }
+
+        // Auto-test API on page load
+        window.addEventListener('load', () => {
+            setTimeout(testAPI, 1000);
+        });
+
+        // Check if we're in an OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('code') || urlParams.get('error')) {
+            document.body.innerHTML = `
+                <div style="text-align: center; padding: 50px;">
+                    <div class="logo">P</div>
+                    <h2>OAuth Processing...</h2>
+                    <p>Please wait while we complete the Pinterest authorization.</p>
+                    <p><em>This window should close automatically.</em></p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
