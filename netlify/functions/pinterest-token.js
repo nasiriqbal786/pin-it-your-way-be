@@ -41,6 +41,7 @@ exports.handler = async (event, context) => {
         };
       }
 
+      console.log('OAuth callback received with code:', code, 'and state:', state);
       if (!code) {
         throw new Error('No authorization code received');
       }
