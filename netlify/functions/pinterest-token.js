@@ -70,17 +70,18 @@ exports.handler = async (event, context) => {
         statusCode: 200,
         headers: { 'Content-Type': 'text/html' },
         body: `
-          <html><body>
-            <script>
-              window.opener.postMessage({
-                success: true,
-                token: '${tokenResponse.data.access_token}',
-                refreshToken: '${tokenResponse.data.refresh_token || ''}',
-                user: ${JSON.stringify(userResponse.data)}
-              }, '*');
-              window.close();
-            </script>
-          </body></html>
+            <html><body>
+                <script>
+                    // Pass data to parent window and close
+                    const urlParams = new URLSearchParams();
+                    urlParams.set('success', 'true');
+                    urlParams.set('token', '${tokenResponse.data.access_token}');
+                    urlParams.set('refreshToken', '${tokenResponse.data.refresh_token || ''}');
+                    urlParams.set('user', encodeURIComponent(JSON.stringify(${JSON.stringify(userResponse.data)})));
+                    
+                    window.location.href = window.location.origin + window.location.pathname + '?' + urlParams.toString();
+                </script>
+            </body></html>
         `
       };
     }
