@@ -1,4 +1,4 @@
-// Handle OAuth callback and exchange code for token
+// Handle OAuth callback and token refresh
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
@@ -19,7 +19,7 @@ exports.handler = async (event, context) => {
             throw new Error('Missing Pinterest configuration');
         }
 
-        // Handle GET request (OAuth callback from Pinterest)
+        // === 1. OAuth callback (GET) ===
         if (event.httpMethod === 'GET') {
             const { code, state, error } = event.queryStringParameters || {};
 
@@ -28,87 +28,104 @@ exports.handler = async (event, context) => {
                     statusCode: 400,
                     headers: { 'Content-Type': 'text/html' },
                     body: `
-            <html><body>
-              <script>
-                window.opener.postMessage({
-                  success: false, 
-                  error: '${error}'
-                }, '*');
-                window.close();
-              </script>
-            </body></html>
-          `
+                        <html><body>
+                          <script>
+                            window.opener.postMessage({
+                              success: false, 
+                              error: '${error}'
+                            }, '*');
+                            window.close();
+                          </script>
+                        </body></html>
+                    `
                 };
             }
 
-            console.log('OAuth callback received with code:', code, 'and state:', state);
             if (!code) {
                 throw new Error('No authorization code received');
             }
 
-            // 1) Build form data
+            console.log('OAuth callback received with code:', code, 'and state:', state);
+
+            // Exchange code for token
             const params = new URLSearchParams();
             params.append('grant_type', 'authorization_code');
+            params.append('client_id', PINTEREST_APP_ID);
+            params.append('client_secret', PINTEREST_APP_SECRET);
             params.append('code', code);
             params.append('redirect_uri', PINTEREST_REDIRECT_URI);
 
-            // 2) Build Basic Auth header
-            const basicAuth = Buffer.from(
-                `${PINTEREST_APP_ID}:${PINTEREST_APP_SECRET}`
-            ).toString('base64');
+            const tokenResponse = await axios.post(
+                'https://api.pinterest.com/v5/oauth/token',
+                params.toString(),
+                { headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' } }
+            );
 
-            // 3) Exchange code for token
-            const tokenResponse = await axios({
-                method: 'post',
-                url: 'https://api.pinterest.com/v5/oauth/token',
-                data: params.toString(),
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                    'Authorization': `Basic ${basicAuth}`
-                }
-            });
-
-
-            // Get user info
+            // Fetch user info
             const userResponse = await axios.get('https://api.pinterest.com/v5/user_account', {
                 headers: {
                     'Authorization': `Bearer ${tokenResponse.data.access_token}`
                 }
             });
 
-            // Return success to extension
+            // Return data safely via postMessage
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'text/html' },
                 body: `
-            <html><body>
-                <script>
-                    // Pass data to parent window and close
-                    const urlParams = new URLSearchParams();
-                    urlParams.set('success', 'true');
-                    urlParams.set('token', '${tokenResponse.data.access_token}');
-                    urlParams.set('refreshToken', '${tokenResponse.data.refresh_token || ''}');
-                    urlParams.set('user', encodeURIComponent(JSON.stringify(${JSON.stringify(userResponse.data)})));
-                    
-                    window.location.href = window.location.origin + window.location.pathname + '?' + urlParams.toString();
-                </script>
-            </body></html>
-        `
+                    <html><body>
+                        <script>
+                            window.opener.postMessage({
+                                success: true,
+                                token: '${tokenResponse.data.access_token}',
+                                refreshToken: '${tokenResponse.data.refresh_token || ''}',
+                                expiresIn: ${tokenResponse.data.expires_in || 0},
+                                user: ${JSON.stringify(userResponse.data)}
+                            }, '*');
+                            window.close();
+                        </script>
+                    </body></html>
+                `
             };
         }
 
-        // Handle POST request (from extension for API calls)
+        // === 2. Extension API calls (POST) ===
         if (event.httpMethod === 'POST') {
             const { action, token, ...params } = JSON.parse(event.body);
-
-            if (!token) {
-                throw new Error('Access token required');
-            }
 
             let response;
 
             switch (action) {
+                case 'refreshToken':
+                    if (!params.refreshToken) {
+                        throw new Error('Refresh token required');
+                    }
+
+                    const refreshParams = new URLSearchParams();
+                    refreshParams.append('grant_type', 'refresh_token');
+                    refreshParams.append('refresh_token', params.refreshToken);
+                    refreshParams.append('client_id', PINTEREST_APP_ID);
+                    refreshParams.append('client_secret', PINTEREST_APP_SECRET);
+
+                    response = await axios.post(
+                        'https://api.pinterest.com/v5/oauth/token',
+                        refreshParams.toString(),
+                        { headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' } }
+                    );
+
+                    return {
+                        statusCode: 200,
+                        headers,
+                        body: JSON.stringify({
+                            success: true,
+                            accessToken: response.data.access_token,
+                            refreshToken: response.data.refresh_token || params.refreshToken,
+                            expiresIn: response.data.expires_in
+                        })
+                    };
+
                 case 'getBoards':
+                    if (!token) throw new Error('Access token required');
                     response = await axios.get('https://api.pinterest.com/v5/boards', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -126,13 +143,11 @@ exports.handler = async (event, context) => {
                     };
 
                 case 'createPin':
+                    if (!token) throw new Error('Access token required');
                     const { boardId, imageUrl, title, description } = params;
                     response = await axios.post('https://api.pinterest.com/v5/pins', {
                         board_id: boardId,
-                        media_source: {
-                            source_type: 'image_url',
-                            url: imageUrl
-                        },
+                        media_source: { source_type: 'image_url', url: imageUrl },
                         title: title || 'Pinned via Pin It Your Way',
                         description: description || ''
                     }, {
@@ -141,7 +156,6 @@ exports.handler = async (event, context) => {
                             'Content-Type': 'application/json'
                         }
                     });
-
                     return {
                         statusCode: 200,
                         headers,
@@ -157,9 +171,8 @@ exports.handler = async (event, context) => {
         }
 
     } catch (error) {
-        console.error('Pinterest token error:', error.response?.data || error.message);
+        console.error('Pinterest token error:', error);
 
-        // Handle Pinterest API errors
         if (error.response) {
             return {
                 statusCode: error.response.status,
