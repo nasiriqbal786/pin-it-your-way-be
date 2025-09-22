@@ -1,4 +1,4 @@
-// Handle OAuth callback and token refresh
+// Handle OAuth callback and exchange code for token
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
@@ -28,16 +28,16 @@ exports.handler = async (event, context) => {
                     statusCode: 400,
                     headers: { 'Content-Type': 'text/html' },
                     body: `
-                        <html><body>
-                          <script>
-                            window.opener.postMessage({
-                              success: false, 
-                              error: '${error}'
-                            }, '*');
-                            window.close();
-                          </script>
-                        </body></html>
-                    `
+            <html><body>
+              <script>
+                window.opener.postMessage({
+                  success: false, 
+                  error: '${error}'
+                }, '*');
+                window.close();
+              </script>
+            </body></html>
+          `
                 };
             }
 
@@ -83,8 +83,8 @@ exports.handler = async (event, context) => {
                 statusCode: 200,
                 headers: { 'Content-Type': 'text/html' },
                 body: `
-                    <html><body>
-                        <script>
+            <html><body>
+                <script>
                             window.opener.postMessage({
                                 success: true,
                                 token: '${tokenResponse.data.access_token}',
@@ -93,9 +93,9 @@ exports.handler = async (event, context) => {
                                 user: ${JSON.stringify(userResponse.data)}
                             }, '*');
                             window.close();
-                        </script>
-                    </body></html>
-                `
+                </script>
+            </body></html>
+        `
             };
         }
 
