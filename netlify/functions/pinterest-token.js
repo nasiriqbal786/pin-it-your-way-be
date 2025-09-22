@@ -46,9 +46,7 @@ exports.handler = async (event, context) => {
                 throw new Error('No authorization code received');
             }
 
-            console.log('OAuth callback received with code:', code, 'and state:', state);
-
-            // Exchange code for token
+            // 1) Build form data
             const params = new URLSearchParams();
             params.append('grant_type', 'authorization_code');
             params.append('code', code);
@@ -78,21 +76,21 @@ exports.handler = async (event, context) => {
                 }
             });
 
-            // Return data safely via postMessage
+            // Return success to extension
             return {
                 statusCode: 200,
                 headers: { 'Content-Type': 'text/html' },
                 body: `
             <html><body>
                 <script>
-                            window.opener.postMessage({
-                                success: true,
-                                token: '${tokenResponse.data.access_token}',
-                                refreshToken: '${tokenResponse.data.refresh_token || ''}',
-                                expiresIn: ${tokenResponse.data.expires_in || 0},
-                                user: ${JSON.stringify(userResponse.data)}
-                            }, '*');
-                            window.close();
+                    // Pass data to parent window and close
+                    const urlParams = new URLSearchParams();
+                    urlParams.set('success', 'true');
+                    urlParams.set('token', '${tokenResponse.data.access_token}');
+                    urlParams.set('refreshToken', '${tokenResponse.data.refresh_token || ''}');
+                    urlParams.set('user', encodeURIComponent(JSON.stringify(${JSON.stringify(userResponse.data)})));
+                    
+                    window.location.href = window.location.origin + window.location.pathname + '?' + urlParams.toString();
                 </script>
             </body></html>
         `
@@ -110,36 +108,7 @@ exports.handler = async (event, context) => {
             let response;
 
             switch (action) {
-                case 'refreshToken':
-                    if (!params.refreshToken) {
-                        throw new Error('Refresh token required');
-                    }
-
-                    const refreshParams = new URLSearchParams();
-                    refreshParams.append('grant_type', 'refresh_token');
-                    refreshParams.append('refresh_token', params.refreshToken);
-                    refreshParams.append('client_id', PINTEREST_APP_ID);
-                    refreshParams.append('client_secret', PINTEREST_APP_SECRET);
-
-                    response = await axios.post(
-                        'https://api.pinterest.com/v5/oauth/token',
-                        refreshParams.toString(),
-                        { headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' } }
-                    );
-
-                    return {
-                        statusCode: 200,
-                        headers,
-                        body: JSON.stringify({
-                            success: true,
-                            accessToken: response.data.access_token,
-                            refreshToken: response.data.refresh_token || params.refreshToken,
-                            expiresIn: response.data.expires_in
-                        })
-                    };
-
                 case 'getBoards':
-                    if (!token) throw new Error('Access token required');
                     response = await axios.get('https://api.pinterest.com/v5/boards', {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
@@ -157,11 +126,13 @@ exports.handler = async (event, context) => {
                     };
 
                 case 'createPin':
-                    if (!token) throw new Error('Access token required');
                     const { boardId, imageUrl, title, description } = params;
                     response = await axios.post('https://api.pinterest.com/v5/pins', {
                         board_id: boardId,
-                        media_source: { source_type: 'image_url', url: imageUrl },
+                        media_source: {
+                            source_type: 'image_url',
+                            url: imageUrl
+                        },
                         title: title || 'Pinned via Pin It Your Way',
                         description: description || ''
                     }, {
