@@ -33,6 +33,8 @@ export async function handler(event, context) {
     authUrl.searchParams.set('scope', scopes.join(','));
     authUrl.searchParams.set('state', state);
 
+    console.log('Pinterest OAuth URL:', authUrl.toString());
+
     return {
       statusCode: 200,
       headers,
