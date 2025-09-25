@@ -8,7 +8,7 @@ export async function handler(event, context) {
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     };
-    const apiConfig = new ApiConfig();
+    const apiConfig = new ApiConfig({ verbosity: 2 });
 
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
