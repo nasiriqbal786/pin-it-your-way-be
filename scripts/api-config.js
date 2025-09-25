@@ -1,4 +1,4 @@
-const globalAgents = require('global-agents');
+import { bootstrap } from 'global-agents';
 
 export class ApiConfig {
   constructor() {
@@ -30,7 +30,7 @@ export class ApiConfig {
     this.oauth_uri = process.env.PINTEREST_OAUTH_URI || DEFAULT_OAUTH_URI;
     this.api_uri = process.env.PINTEREST_API_URI || DEFAULT_API_URI;
 
-    globalAgents.bootstrap();
+    bootstrap();
   }
 
     /**

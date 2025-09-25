@@ -1,5 +1,4 @@
-// Start the OAuth flow - generates authorization URL
-exports.handler = async (event, context) => {
+export async function handler(event, context) {
   // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
