@@ -1,7 +1,7 @@
 import { bootstrap } from 'global-agent';
 
 export class ApiConfig {
-  constructor() {
+  constructor({ verbosity = 2 }) {
     // Construct the redirect_uri for the OAuth process. The REDIRECT_URI must
     // be literally the same as configured at https://developers.pinterest.com/apps/.
     // The port is fixed for now. It would be better to configure a selection
