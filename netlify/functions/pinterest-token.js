@@ -1,5 +1,6 @@
 // Handle OAuth callback and exchange code for token
 const axios = require('axios');
+import { ApiConfig } from '../../scripts/api-config.js';
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -7,6 +8,7 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     };
+    const apiConfig = new ApiConfig();
 
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
@@ -50,11 +52,11 @@ exports.handler = async (event, context) => {
             const params = new URLSearchParams();
             params.append('grant_type', 'authorization_code');
             params.append('code', code);
-            params.append('redirect_uri', PINTEREST_REDIRECT_URI);
+            params.append('redirect_uri', apiConfig.redirect_uri);
 
             // 2) Build Basic Auth header
             const basicAuth = Buffer.from(
-                `${PINTEREST_APP_ID}:${PINTEREST_APP_SECRET}`
+                `${apiConfig.app_id}:${apiConfig.app_secret}`
             ).toString('base64');
 
             // 3) Exchange code for token
