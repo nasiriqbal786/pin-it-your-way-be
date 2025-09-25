@@ -1,4 +1,4 @@
-import { bootstrap } from 'global-agents';
+import { bootstrap } from 'global-agent';
 
 export class ApiConfig {
   constructor() {
