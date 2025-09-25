@@ -58,6 +58,7 @@ export async function handler(event, context) {
             const basicAuth = Buffer.from(
                 `${apiConfig.app_id}:${apiConfig.app_secret}`
             ).toString('base64');
+            console.log('Basic Auth Header:', basicAuth);
 
             // 3) Exchange code for token
             const tokenResponse = await axios({
